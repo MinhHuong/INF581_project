@@ -1,5 +1,6 @@
 import numpy as np
 import random
+from matplotlib.pyplot import *
 
 ### ENVIRONMENT ###
 
@@ -31,7 +32,7 @@ class Environment:
 
         self.action_space_n = 4 # cardinality of action space : {LEFT, RIGHT, UP, DOWN} = {0, 1, 2, 3}
 
-        self.state_space_n = self.width * self.height # cardinality of action space : Position of agent
+        self.state_space_n = (self.width+1) * (self.height+1) # cardinality of action space : Position of agent
 
         self.agent_state = pos
 
@@ -49,14 +50,15 @@ class Environment:
 
         # for conversion between position and tile #
         # this will help when using Q_table #
-        self.pairs = np.array([(i, j) for i in range(self.width) for j in range(self.height)])
+        self.pairs = np.array([(i, j) for i in range(self.width+1) for j in range(self.height+1)])
 
-    def display(self):
+    def display(self, ax):
         '''
         display the environment
 
         :return:None
         '''
+        """
         for i in range(self.height + 1):
             for j in range(self.width + 1):
                 if j < self.width:
@@ -73,6 +75,13 @@ class Environment:
                 else:
                     print('|', end='', flush=True)
             print()
+        """
+        ion()
+        ax.plot(self.agent_state[0], self.agent_state[1], "rs", markersize=30)
+        show()
+        pause(0.3)
+        ax.plot(self.agent_state[0], self.agent_state[1], "ws", markersize=30)
+
 
     def go_into_obstacle(self, new_pos):
         '''
@@ -98,25 +107,25 @@ class Environment:
         go_into_wall = False
         go_into_obstacle = False
         new_pos = self.agent_state
-        if a == 0:  # UP
+        if a == 0:                                                      # LEFT
             if self.agent_state[0] == 0:
                 go_into_wall = True
             else:
                 new_pos = (self.agent_state[0] - 1, self.agent_state[1])
                 go_into_obstacle = self.go_into_obstacle(new_pos)
-        elif a == 1:  # DOWN
+        elif a == 1:                                                    # RIGHT
             if self.agent_state[0] == self.width - 1:
                 go_into_wall = True
             else:
                 new_pos = (self.agent_state[0] + 1, self.agent_state[1])
                 go_into_obstacle = self.go_into_obstacle(new_pos)
-        elif a == 2:  # LEFT
+        elif a == 2:                                                    # DOWN
             if self.agent_state[1] == 0:
                 go_into_wall = True
             else:
                 new_pos = (self.agent_state[0], self.agent_state[1] - 1)
                 go_into_obstacle = self.go_into_obstacle(new_pos)
-        else:  # RIGHT
+        else:                                                           # UP
             if self.agent_state[1] == self.height - 1:
                 go_into_wall = True
             else:
@@ -125,12 +134,13 @@ class Environment:
 
         # calculate reward
         reward = -1
+        done = False
         if go_into_wall or go_into_obstacle:
             reward = -5
-        elif self.agent_state in self.trashes:
+            #done = True
+        if self.agent_state in self.trashes:
             self.trashes.remove(self.agent_state)
             reward = 0
-        done = False
         if len(self.trashes) == 0:
             done = True
         info = "All is well!"
@@ -185,7 +195,7 @@ class Environment:
         :param pos: position ccordinates
         :return: tile number
         '''
-        i = pos[0] * self.width + pos[1]
-        if i < (self.width * self.height):
+        i = pos[0] * (self.width+1) + pos[1]
+        if i < (self.width+1) * (self.height+1):
             return i
         return -1
