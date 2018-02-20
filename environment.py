@@ -51,8 +51,17 @@ class Environment:
         # for conversion between position and tile #
         # this will help when using Q_table #
         self.pairs = np.array([(i, j) for i in range(self.width+1) for j in range(self.height+1)])
+        self.fig = figure(figsize=(7, 7))
+        self.ax = self.fig.add_subplot(1, 1, 1)
+        self.xticks = np.arange(-0.5, self.width + 0.5, 1)
+        self.yticks = np.arange(-0.5, self.height + 0.5, 1)
+        self.ax.grid()
+        self.ax.set_xticks(self.xticks)
+        self.ax.set_yticks(self.yticks)
+        self.ax.plot(np.array(self.trashes)[:, 0], np.array(self.trashes)[:, 1], "co", markersize=30, alpha=0.2)
+        self.ax.plot(np.array(self.obstacles)[:, 0], np.array(self.obstacles)[:, 1], "ks", markersize=30, alpha=0.4)
 
-    def display(self, ax):
+    def display(self):
         '''
         display the environment
 
@@ -77,10 +86,10 @@ class Environment:
             print()
         """
         ion()
-        ax.plot(self.agent_state[0], self.agent_state[1], "rs", markersize=30)
+        self.ax.plot(self.agent_state[0], self.agent_state[1], "rX", markersize=30)
         show()
         pause(0.3)
-        ax.plot(self.agent_state[0], self.agent_state[1], "ws", markersize=30)
+        self.ax.plot(self.agent_state[0], self.agent_state[1], "ws", markersize=30)
 
 
     def go_into_obstacle(self, new_pos):
@@ -114,7 +123,7 @@ class Environment:
                 new_pos = (self.agent_state[0] - 1, self.agent_state[1])
                 go_into_obstacle = self.go_into_obstacle(new_pos)
         elif a == 1:                                                    # RIGHT
-            if self.agent_state[0] == self.width - 1:
+            if self.agent_state[0] == self.width:
                 go_into_wall = True
             else:
                 new_pos = (self.agent_state[0] + 1, self.agent_state[1])
@@ -126,24 +135,27 @@ class Environment:
                 new_pos = (self.agent_state[0], self.agent_state[1] - 1)
                 go_into_obstacle = self.go_into_obstacle(new_pos)
         else:                                                           # UP
-            if self.agent_state[1] == self.height - 1:
+            if self.agent_state[1] == self.height:
                 go_into_wall = True
             else:
                 new_pos = (self.agent_state[0], self.agent_state[1] + 1)
                 go_into_obstacle = self.go_into_obstacle(new_pos)
 
-        # calculate reward
+        new_pos = self.pos2tile(new_pos)
+        # default values
         reward = -1
         done = False
+        info = "All is well!"
         if go_into_wall or go_into_obstacle:
-            reward = -5
-            #done = True
+            reward = -2
+        #if go_into_obstacle:
+        #    done = True
         if self.agent_state in self.trashes:
             self.trashes.remove(self.agent_state)
-            reward = 0
+            reward = 1
+            info = "Clean!"
         if len(self.trashes) == 0:
             done = True
-        info = "All is well!"
         if go_into_wall:
             info = "Go into walls!"
         if go_into_obstacle:
@@ -171,7 +183,14 @@ class Environment:
         while new_pos in self.obstacles:
             new_pos = (np.random.randint(0, self.width), np.random.randint(0, self.height))
         self.agent_state = new_pos
-        return new_pos
+        cla()
+        self.ax.grid()
+        self.ax.set_xticks(self.xticks)
+        self.ax.set_yticks(self.yticks)
+        self.ax.plot(np.array(self.trashes)[:, 0], np.array(self.trashes)[:, 1], "co", markersize=30, alpha=0.2)
+        self.ax.plot(np.array(self.obstacles)[:, 0], np.array(self.obstacles)[:, 1], "ks", markersize=30, alpha=0.4)
+
+        return self.pos2tile(new_pos)
 
     def action_sample(self):
         '''
