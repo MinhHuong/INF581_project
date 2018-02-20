@@ -1,3 +1,4 @@
 # INF581_project
 
-The repo to share code of INF581 project
+gameUI.py is used for graphic surface only.
+main.py should be used for algorithms testing
