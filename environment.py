@@ -1,5 +1,6 @@
 import numpy as np
 import random
+from agent import Agent, Action
 from matplotlib.pyplot import *
 
 ### ENVIRONMENT ###
@@ -13,10 +14,11 @@ class Environment:
         'nb_trashes': 30
     }
 
-    def __init__(self, pos = (0, 0), w=0, h=0, nb_trashes=0):
+    def __init__(self, agent, w=0, h=0, nb_trashes=0):
         '''
         class initialisation
-
+        
+        :param agent: the agent to add in the environment
         :param w: width of the environment (not including walls)
         :param h: height of the environment (not including walls)
         :param nb_trashes: number of trashes in the environment
@@ -30,23 +32,27 @@ class Environment:
 
         self.obstacles = self.default_parameters['obstacles']
 
-        self.action_space_n = 4 # cardinality of action space : {LEFT, RIGHT, UP, DOWN} = {0, 1, 2, 3}
+        self.action_space_n = Action.size() # cardinality of action space
 
         self.state_space_n = (self.width+1) * (self.height+1) # cardinality of action space : Position of agent
 
-        self.agent_state = pos
+        #self.agent.position = pos # agent's state is its position in the grid, in Euclidean space
+        self.agent = agent # create a new agent in the environement
 
         # randomize positions of trashes
         self.trashes = []
         i = 0
-        random.seed(self.nb_trashes)
+        random.seed(self.nb_trashes) # to ensure that every time the random will return the same sequence
         while i < self.nb_trashes:
             x = random.randint(0, self.width)
             y = random.randint(0, self.height)
+
+            # if newly generated position is not that of another trash / an obstacle
             if (x, y) not in self.trashes and (x, y) not in self.obstacles:
                 self.trashes.append((x, y))
                 i += 1
-        # what if the starting point coincides with the trashes position #
+
+        # what if the starting point coincides with the trashes position --> might try to avoid that case #
 
         # for conversion between position and tile #
         # this will help when using Q_table #
@@ -67,29 +73,11 @@ class Environment:
 
         :return:None
         '''
-        """
-        for i in range(self.height + 1):
-            for j in range(self.width + 1):
-                if j < self.width:
-                    if (i, j) == self.agent_state:
-                        symbol = 'o'
-                    elif (i, j) in self.obstacles:
-                        symbol = '#'
-                    elif (i, j) in self.trashes:
-                        symbol = '*'
-                    else:
-                        symbol = ' '
-                    print('| %s ' % symbol, end='',
-                          flush=True)  # don't bother these parameters I only use those to print on same line
-                else:
-                    print('|', end='', flush=True)
-            print()
-        """
         ion()
-        self.ax.plot(self.agent_state[0], self.agent_state[1], "rX", markersize=30)
+        self.ax.plot(self.agent.position[0], self.agent.position[1], "rX", markersize=30)
         show()
         pause(0.3)
-        self.ax.plot(self.agent_state[0], self.agent_state[1], "ws", markersize=30)
+        self.ax.plot(self.agent.position[0], self.agent.position[1], "ws", markersize=30)
 
 
     def go_into_obstacle(self, new_pos):
@@ -101,7 +89,8 @@ class Environment:
         if new_pos in self.obstacles:
             return True
         else:
-            self.agent_state = new_pos
+            #self.agent.position = new_pos
+            self.agent.position = new_pos
             return False
 
     def step(self, a):
@@ -115,30 +104,30 @@ class Environment:
         # calculate new state
         go_into_wall = False
         go_into_obstacle = False
-        new_pos = self.agent_state
-        if a == 0:                                                      # LEFT
-            if self.agent_state[0] == 0:
+        new_pos = self.agent.position
+        if a == Action.LEFT:                                                      # LEFT
+            if self.agent.position[0] == 0:
                 go_into_wall = True
             else:
-                new_pos = (self.agent_state[0] - 1, self.agent_state[1])
+                new_pos = (self.agent.position[0] - 1, self.agent.position[1])
                 go_into_obstacle = self.go_into_obstacle(new_pos)
-        elif a == 1:                                                    # RIGHT
-            if self.agent_state[0] == self.width:
+        elif a == Action.RIGHT:                                                    # RIGHT
+            if self.agent.position[0] == self.width:
                 go_into_wall = True
             else:
-                new_pos = (self.agent_state[0] + 1, self.agent_state[1])
+                new_pos = (self.agent.position[0] + 1, self.agent.position[1])
                 go_into_obstacle = self.go_into_obstacle(new_pos)
-        elif a == 2:                                                    # DOWN
-            if self.agent_state[1] == 0:
+        elif a == Action.DOWN:                                                    # DOWN
+            if self.agent.position[1] == 0:
                 go_into_wall = True
             else:
-                new_pos = (self.agent_state[0], self.agent_state[1] - 1)
+                new_pos = (self.agent.position[0], self.agent.position[1] - 1)
                 go_into_obstacle = self.go_into_obstacle(new_pos)
         else:                                                           # UP
-            if self.agent_state[1] == self.height:
+            if self.agent.position[1] == self.height:
                 go_into_wall = True
             else:
-                new_pos = (self.agent_state[0], self.agent_state[1] + 1)
+                new_pos = (self.agent.position[0], self.agent.position[1] + 1)
                 go_into_obstacle = self.go_into_obstacle(new_pos)
 
         new_pos = self.pos2tile(new_pos)
@@ -150,8 +139,8 @@ class Environment:
             reward = -2
         #if go_into_obstacle:
         #    done = True
-        if self.agent_state in self.trashes:
-            self.trashes.remove(self.agent_state)
+        if self.agent.position in self.trashes:
+            self.trashes.remove(self.agent.position)
             reward = 1
             info = "Clean!"
         if len(self.trashes) == 0:
@@ -182,7 +171,7 @@ class Environment:
         new_pos = (np.random.randint(0, self.width), np.random.randint(0, self.height))
         while new_pos in self.obstacles:
             new_pos = (np.random.randint(0, self.width), np.random.randint(0, self.height))
-        self.agent_state = new_pos
+        self.agent.position = new_pos
         cla()
         self.ax.grid()
         self.ax.set_xticks(self.xticks)
