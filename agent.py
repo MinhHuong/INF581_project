@@ -49,6 +49,11 @@ class Agent:
 
 		Parameters
 		----------
+		q: Q table
+
+		Returns
+		-------
+		?
 		'''
 		assert self.tau >= 0.0
 		q_tilde = q - np.max(q)
@@ -57,7 +62,18 @@ class Agent:
 
 	
 	def act_with_softmax(self, s, q):
-		'''Agent acts with softmax'''
+		'''
+		Agent acts with softmax
+
+		Parameters
+		----------
+		s: current state
+		q: Q table
+
+		Returns
+		-------
+		?
+		'''
 		
 		prob_a = softmax(q[s, :])
 		cumsum_a = np.cumsum(prob_a)
@@ -88,8 +104,8 @@ class Agent:
 		:param a_prime: new action
 		:return: the update score
 		'''
-		td = r + self.gamma * q[s_prime, a_prime] - q[s, a]
-		return q[s, a] + self.alpha * td
+		td = r + self.gamma * q[s_prime, a_prime] - q[s, a] # delta_t = r + gamme * Q(s',a') - Q(s,a)
+		return q[s, a] + self.alpha * td # Q(s,a) = Q(s,a) + alpha * delta_t
 
 
 	def q_learning_update(self, q, s, a, r, s_prime):
@@ -101,5 +117,5 @@ class Agent:
 		:param s_prime: new state
 		:return: the update score
 		'''
-		td = r + self.gamma * np.max(q[s_prime, :]) - q[s, a]
-		return q[s, a] + self.alpha * td
+		td = r + self.gamma * np.max(q[s_prime, :]) - q[s, a] # delta_t = r + gamma * max[Q(s',a')] - Q(s,a)
+		return q[s, a] + self.alpha * td # Q(s,a) = Q(s,a) + alpha * delta_t

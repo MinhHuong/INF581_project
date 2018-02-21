@@ -10,31 +10,36 @@ from agent import Agent, Action
 from main import *
 import numpy as np
 
-agent = Agent(pos=(0,0))
-env = Environment(agent)
+
+######################################################################################
+#      teaching the agent to clean trashes properly with reinforcement learning      #
+######################################################################################
+
+agent = Agent(pos=(0,0)) # create a new agent
+env = Environment(agent) # add the agent to the environment
 
 facteur = 50
+agent_pos = env.agent.position # get the agent's position
+agent_pos = (agent_pos[0]*facteur, agent_pos[1]*facteur) # multiply it by a factor
 
-agent_pos = env.agent.position
+n_a = env.action_space_n # get the action space size
+n_s = env.state_space_n # get the state space size
 
-agent_pos = (agent_pos[0]*facteur, agent_pos[1]*facteur)
-
-n_a = env.action_space_n
-n_s = env.state_space_n
-
-q_table = np.zeros([n_s, n_a])
-e_table = np.zeros([n_s, n_a])
+q_table = np.zeros([n_s, n_a]) # init Q table
+e_table = np.zeros([n_s, n_a]) # init eligibility traces
 
 # cleaning rate for each episode
 clean_rate = []
 crashes = []
-
 crash_count = 0
+n_episodes = 20
+n_timesteps = 200
 
-for i_epsisode in range(20):
+for i_epsisode in range(n_episodes):
     s = env.reset()
     a = agent.act_with_epsilon_greedy(s, q_table)
-    for t in range(200):
+
+    for t in range(n_timesteps):
         s_prime, reward, done, info = env.step(a)
 
         a_prime = agent.act_with_epsilon_greedy(s_prime, q_table)
@@ -64,6 +69,12 @@ for i_epsisode in range(20):
     clean_rate.append((env.nb_trashes - len(env.trashes)) / env.nb_trashes)
     crashes.append(crash_count)
 
+
+
+##################################################
+#      making real cute graphical interface      #
+##################################################
+
 pygame.init()
 
 pygame.font.init()
@@ -72,7 +83,6 @@ height_score = 50
 
 FPS = 20 # frames per second setting
 fpsClock = pygame.time.Clock()
-
 
 # set up the window
 WIDTH = 550
@@ -95,6 +105,7 @@ s = env.reset()
 nb_trashes = len(env.trashes)
 a = agent.act_with_epsilon_greedy(s,q_table)
 
+# print out graphical interface for the LAST episode only !!!
 for t in range(100):
 
     s_prime, reward, done, info = env.step(a)
@@ -127,13 +138,13 @@ for t in range(100):
             DISPLAYSURF.blit(rock_Img, (rock_pos[0] * facteur, rock_pos[1] * facteur))
 
         if a == Action.LEFT:
-            DISPLAYSURF.blit(agent_Img, (env.agent_state[0] * facteur + (1 - crash) * (facteur - tick), env.agent_state[1] * facteur))
+            DISPLAYSURF.blit(agent_Img, (env.agent.position[0] * facteur + (1 - crash) * (facteur - tick), env.agent.position[1] * facteur))
         elif a == Action.RIGHT:
-            DISPLAYSURF.blit(agent_Img, (env.agent_state[0] * facteur - (1 - crash) * (facteur - tick), env.agent_state[1] * facteur))
+            DISPLAYSURF.blit(agent_Img, (env.agent.position[0] * facteur - (1 - crash) * (facteur - tick), env.agent.position[1] * facteur))
         elif a == Action.DOWN:
-            DISPLAYSURF.blit(agent_Img, (env.agent_state[0] * facteur, env.agent_state[1] * facteur + (1 - crash) * (facteur - tick)))
+            DISPLAYSURF.blit(agent_Img, (env.agent.position[0] * facteur, env.agent.position[1] * facteur + (1 - crash) * (facteur - tick)))
         elif a == Action.UP:
-            DISPLAYSURF.blit(agent_Img, (env.agent_state[0] * facteur, env.agent_state[1] * facteur - (1 - crash) * (facteur - tick)))
+            DISPLAYSURF.blit(agent_Img, (env.agent.position[0] * facteur, env.agent.position[1] * facteur - (1 - crash) * (facteur - tick)))
 
         pygame.draw.line(DISPLAYSURF, RED, (0, HEIGHT), (WIDTH, HEIGHT), 2)
 
@@ -161,6 +172,10 @@ for t in range(100):
 clean_rate.append((env.nb_trashes - len(env.trashes)) / env.nb_trashes)
 crashes.append(crash_count)
 
+
+####################################################################
+#        plotting cleaning rate to verify agent's efficiency       #
+####################################################################
 
 import pylab
 

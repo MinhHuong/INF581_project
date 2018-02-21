@@ -7,6 +7,8 @@ from matplotlib.pyplot import *
 
 class Environment:
     '''The class that represents our pretty environment'''
+
+    # some defaults parameters
     default_parameters = {
         'width': 10,
         'height': 10,
@@ -14,9 +16,10 @@ class Environment:
         'nb_trashes': 30
     }
 
+
     def __init__(self, agent, w=0, h=0, nb_trashes=0):
         '''
-        class initialisation
+        Initialize the environment
         
         :param agent: the agent to add in the environment
         :param w: width of the environment (not including walls)
@@ -24,35 +27,29 @@ class Environment:
         :param nb_trashes: number of trashes in the environment
         '''
 
-        self.width = self.default_parameters['width'] if w == 0 else w
+        self.width = self.default_parameters['width'] if w == 0 else w # setting width
+        self.height = self.default_parameters['height'] if h == 0 else h # setting height
 
-        self.height = self.default_parameters['height'] if h == 0 else h
+        self.obstacles = self.default_parameters['obstacles'] # set the obstacles
 
-        self.nb_trashes = self.default_parameters['nb_trashes'] if nb_trashes == 0 else nb_trashes
-
-        self.obstacles = self.default_parameters['obstacles']
-
+        # stuffs related to the Agent (action space, state space, the agent itself)
         self.action_space_n = Action.size() # cardinality of action space
-
         self.state_space_n = (self.width+1) * (self.height+1) # cardinality of action space : Position of agent
+        self.agent = agent # add the agent to the environment
 
-        #self.agent.position = pos # agent's state is its position in the grid, in Euclidean space
-        self.agent = agent # create a new agent in the environement
-
-        # randomize positions of trashes
-        self.trashes = []
+        # start throwing trashes around to get the agent a job
+        self.nb_trashes = self.default_parameters['nb_trashes'] if nb_trashes == 0 else nb_trashes
+        self.trashes = [] # all positions of trashes
         i = 0
         random.seed(self.nb_trashes) # to ensure that every time the random will return the same sequence
         while i < self.nb_trashes:
             x = random.randint(0, self.width)
             y = random.randint(0, self.height)
 
-            # if newly generated position is not that of another trash / an obstacle
-            if (x, y) not in self.trashes and (x, y) not in self.obstacles:
+            # if newly generated position is not that of another trash / an obstacle / the initial position of the agent
+            if (x, y) not in self.trashes and (x, y) not in self.obstacles and (x,y) != agent.position:
                 self.trashes.append((x, y))
                 i += 1
-
-        # what if the starting point coincides with the trashes position --> might try to avoid that case #
 
         # for conversion between position and tile #
         # this will help when using Q_table #
@@ -67,12 +64,12 @@ class Environment:
         self.ax.plot(np.array(self.trashes)[:, 0], np.array(self.trashes)[:, 1], "co", markersize=30, alpha=0.2)
         self.ax.plot(np.array(self.obstacles)[:, 0], np.array(self.obstacles)[:, 1], "ks", markersize=30, alpha=0.4)
 
+
     def display(self):
         '''
-        display the environment
-
-        :return:None
+        Display the environment
         '''
+
         ion()
         self.ax.plot(self.agent.position[0], self.agent.position[1], "rX", markersize=30)
         show()
@@ -82,95 +79,134 @@ class Environment:
 
     def go_into_obstacle(self, new_pos):
         '''
+        Verify whether the agent hits an obstacle
 
         :param new_pos: next state after execution an action
         :return: True if new position is an obstacle
         '''
-        self.agent.position = new_pos
-        if new_pos in self.obstacles:
-            return True
-        else:
-            return False
+
+        # TO DISCUSS
+        # we update new position disregard agent hitting an obstacle or not ? Why don't we do the same in case of walls ?
+        self.agent.position = new_pos 
+        # TO DISCUSS
+
+        return new_pos in self.obstacles
+
 
     def step(self, a):
         '''
-        execute action a
+        Execute action a
 
-        :param a: an action in {LEFT, RIGHT, UP, DOWN}
+        :param a: an action in the action space {LEFT, RIGHT, UP, DOWN}
         :return: new state, reward, termination flag, info
         '''
 
-        # calculate new state
+        # prepare to calculate the new state
         go_into_wall = False
         go_into_obstacle = False
         new_pos = self.agent.position
-        if a == Action.LEFT:                                                      # LEFT
+
+        # TO DISCUSS
+        # so, what is the limit of walls? -1 and width + 1 | height + 1 ?
+        # TO DISCUSS
+
+        # LEFT
+        if a == Action.LEFT:
             if self.agent.position[0] == 0:
                 go_into_wall = True
             else:
-                new_pos = (self.agent.position[0] - 1, self.agent.position[1])
+                new_pos = (self.agent.position[0]-1, self.agent.position[1])
                 go_into_obstacle = self.go_into_obstacle(new_pos)
-        elif a == Action.RIGHT:                                                    # RIGHT
+        # RIGHT
+        elif a == Action.RIGHT:
             if self.agent.position[0] == self.width:
                 go_into_wall = True
             else:
-                new_pos = (self.agent.position[0] + 1, self.agent.position[1])
+                new_pos = (self.agent.position[0]+1, self.agent.position[1])
                 go_into_obstacle = self.go_into_obstacle(new_pos)
-        elif a == Action.DOWN:                                                    # DOWN
+        # DOWN
+        elif a == Action.DOWN:
             if self.agent.position[1] == 0:
                 go_into_wall = True
             else:
-                new_pos = (self.agent.position[0], self.agent.position[1] - 1)
+                new_pos = (self.agent.position[0], self.agent.position[1]-1)
                 go_into_obstacle = self.go_into_obstacle(new_pos)
-        else:                                                           # UP
+        # UP
+        else:
             if self.agent.position[1] == self.height:
                 go_into_wall = True
             else:
-                new_pos = (self.agent.position[0], self.agent.position[1] + 1)
+                new_pos = (self.agent.position[0], self.agent.position[1]+1)
                 go_into_obstacle = self.go_into_obstacle(new_pos)
 
+
         new_pos = self.pos2tile(new_pos)
+
         # default values
         reward = -1
         done = False
-        info = "All is well!"
+        info = "Cleaning brrr--- All is well!"
+
+        # TO DISCUSS
+        # stops both when hitting an obstacle / a wall ? (a wall is also a kind of obstacle)
+        # TO DISCUSS
+
+        # if the agent hits a wall or an obstacle, diminish the reward
         if go_into_wall or go_into_obstacle:
             reward = -2
+        
+        # if the agent hits an obstacle, the episode is done (because the agent is damaged and dead)
         if go_into_obstacle:
             done = True
+        
+        # if the agent manages to clean the trashes which is its job
         if self.agent.position in self.trashes:
             self.trashes.remove(self.agent.position)
             reward = 1
-            info = "Clean!"
+            info = "Find trash! Clean!"
+        
+        # if the environment is totally clean of trashes, my job here is done
         if len(self.trashes) == 0:
             done = True
+        
+        # hits walls and screams for help
         if go_into_wall:
             info = "Go into walls!"
+        
+        # gits obstacle and also screams for help
         if go_into_obstacle:
             info = "Go into obstacle!"
+        
         return [new_pos, reward, done, info]
+
 
     def reset(self):
         '''
-        reinitialize the starting position, and put back the trashes cleaned
+        Reinitialize the starting position, and put back the trashes that have been cleaned (right at the same position as previously initialized)
 
-        :return:
+        Returns
+        -------
+        new_pos: new initial position
         '''
+
         self.trashes.clear()
         i = 0
-        random.seed(self.nb_trashes)
+        random.seed(self.nb_trashes) # return the same sequence of random numbers
         while i < self.nb_trashes:
             x = random.randint(0, self.width)
             y = random.randint(0, self.height)
             if (x, y) not in self.trashes and (x, y) not in self.obstacles:
                 self.trashes.append((x, y))
                 i += 1
+
         # random position starting point for robot
         # new position must be different from obstacles!
         new_pos = (np.random.randint(0, self.width), np.random.randint(0, self.height))
         while new_pos in self.obstacles:
             new_pos = (np.random.randint(0, self.width), np.random.randint(0, self.height))
         self.agent.position = new_pos
+
+        # drawing stuffs
         cla()
         self.ax.grid()
         self.ax.set_xticks(self.xticks)
@@ -178,18 +214,23 @@ class Environment:
         self.ax.plot(np.array(self.trashes)[:, 0], np.array(self.trashes)[:, 1], "co", markersize=30, alpha=0.2)
         self.ax.plot(np.array(self.obstacles)[:, 0], np.array(self.obstacles)[:, 1], "ks", markersize=30, alpha=0.4)
 
+        # return the new initial position
         return self.pos2tile(new_pos)
+
 
     def action_sample(self):
         '''
-        generate random action
+        Generate random action
 
         :return: action to execute
         '''
         return np.random.randint(0, self.action_space_n)
 
+
     def tile2pos(self, i):
         '''
+        Flattened position to tuple
+
         :param i: tile number
         :return: position coordinates
         '''
@@ -197,8 +238,11 @@ class Environment:
             return None
         return self.pairs[int(i)]
 
+
     def pos2tile(self, pos):
         '''
+        Tuple coordinate to flattened position
+
         :param pos: position ccordinates
         :return: tile number
         '''
@@ -206,6 +250,7 @@ class Environment:
         if i < (self.width+1) * (self.height+1):
             return i
         return -1
+
 
     def rollout(self, n_iter, pi):
         '''
@@ -218,11 +263,12 @@ class Environment:
         states = []
         actions = []
         rewards = []
+
         s = self.agent.position
         sprime = self.agent.position
         states.append(self.pos2tile(s))
         for i in range(n_iter):
-            a = np.argmax(pi[sprime])
+            a = np.argmax(pi[sprime]) # get the action that maximizes the policy map
             actions.append(a)
             sprime, reward, done, info = self.step(a)
             states.append(sprime)
@@ -230,6 +276,7 @@ class Environment:
 
             if done:
                 break
+
         self.agent.position = s
         return [states, actions, rewards]
 
