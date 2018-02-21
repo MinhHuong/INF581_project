@@ -19,6 +19,10 @@ if __name__ == '__main__':
     e_table = np.zeros([n_s, n_a])
 
     # for each episode
+    pi = (1.0 / n_a) * np.ones([n_s, n_a])
+
+    [states, actions, rewards] = env.rollout(20, pi)
+
     for i_episode in range(20):
         s = env.reset()
         print("episode {}".format(i_episode))
