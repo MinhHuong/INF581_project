@@ -67,24 +67,6 @@ class Environment:
 
         :return:None
         '''
-        """
-        for i in range(self.height + 1):
-            for j in range(self.width + 1):
-                if j < self.width:
-                    if (i, j) == self.agent_state:
-                        symbol = 'o'
-                    elif (i, j) in self.obstacles:
-                        symbol = '#'
-                    elif (i, j) in self.trashes:
-                        symbol = '*'
-                    else:
-                        symbol = ' '
-                    print('| %s ' % symbol, end='',
-                          flush=True)  # don't bother these parameters I only use those to print on same line
-                else:
-                    print('|', end='', flush=True)
-            print()
-        """
         ion()
         self.ax.plot(self.agent_state[0], self.agent_state[1], "rX", markersize=30)
         show()
