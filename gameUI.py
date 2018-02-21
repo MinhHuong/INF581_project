@@ -32,7 +32,7 @@ crash_count = 0
 for i_epsisode in range(20):
     s = env.reset()
     a = act_with_epsilon_greedy(s, q_table)
-    for t in range(100):
+    for t in range(200):
         s_prime, reward, done, info = env.step(a)
 
         a_prime = act_with_epsilon_greedy(s_prime, q_table)
@@ -45,7 +45,6 @@ for i_epsisode in range(20):
             for b in range(n_a):
                 q_table[u, b] = q_table[u, b] + alpha * delta * e_table[u, b]
             e_table[u] = gamma * lamb * e_table[u]
-        e_table[s] = e_table[s] / gamma / lamb
 
         # Transition to new state
         s = s_prime
@@ -56,6 +55,9 @@ for i_epsisode in range(20):
             crash = 1
 
         crash_count += crash
+
+        if done:
+            break
 
     clean_rate.append((env.nb_trashes - len(env.trashes)) / env.nb_trashes)
     crashes.append(crash_count)
@@ -103,7 +105,6 @@ for t in range(100):
         for b in range(n_a):
             q_table[u, b] = q_table[u, b] + alpha * delta * e_table[u, b]
         e_table[u] = gamma * lamb * e_table[u]
-    e_table[s] = e_table[s] / gamma / lamb
 
     # Since the agent will not change position if it crashes the walls or obstacle
     # we need to take into account our graphic views
@@ -150,9 +151,11 @@ for t in range(100):
     s = s_prime
     a = a_prime
 
+    if done:
+        break
+
 clean_rate.append((env.nb_trashes - len(env.trashes)) / env.nb_trashes)
 crashes.append(crash_count)
-print(q_table)
 
 
 import pylab

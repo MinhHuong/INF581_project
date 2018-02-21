@@ -80,10 +80,10 @@ class Environment:
         :param new_pos: next state after execution an action
         :return: True if new position is an obstacle
         '''
+        self.agent_state = new_pos
         if new_pos in self.obstacles:
             return True
         else:
-            self.agent_state = new_pos
             return False
 
     def step(self, a):
@@ -130,8 +130,8 @@ class Environment:
         info = "All is well!"
         if go_into_wall or go_into_obstacle:
             reward = -2
-        #if go_into_obstacle:
-        #    done = True
+        if go_into_obstacle:
+            done = True
         if self.agent_state in self.trashes:
             self.trashes.remove(self.agent_state)
             reward = 1
@@ -200,3 +200,32 @@ class Environment:
         if i < (self.width+1) * (self.height+1):
             return i
         return -1
+
+    def rollout(self, n_iter, pi):
+        '''
+        Generate the data (state, action, reward) for n_iter iterations in advanced by following policy pi
+
+        :param n_iter: number of iterations to anticipate
+        :param pi: the policy to follow (matrix of probability of actions to take at each state)
+        :return: a set of states, actions, and reward
+        '''
+        states = []
+        actions = []
+        rewards = []
+        s = self.agent_state
+        sprime = self.agent_state
+        states.append(self.pos2tile(s))
+        for i in range(n_iter):
+            a = np.argmax(pi[sprime])
+            actions.append(a)
+            sprime, reward, done, info = self.step(a)
+            states.append(sprime)
+            rewards.append(reward)
+
+            if done:
+                break
+        self.agent_state = s
+        return [states, actions, rewards]
+
+
+
