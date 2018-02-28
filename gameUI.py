@@ -32,26 +32,20 @@ e_table = np.zeros([n_s, n_a]) # init eligibility traces
 clean_rate = []
 crashes = []
 crash_count = 0
-n_episodes = 20
-n_timesteps = 200
+n_episodes = 300
+n_timesteps = 100
 
+#q_table=agent.NFQ(env, n_timesteps)
 for i_epsisode in range(n_episodes):
     s = env.reset()
-    a = agent.act_with_epsilon_greedy(s, q_table)
+    a = agent.get_action(s, q_table, method="greedy")
 
     for t in range(n_timesteps):
         s_prime, reward, done, info = env.step(a)
 
-        a_prime = agent.act_with_epsilon_greedy(s_prime, q_table)
+        a_prime = agent.get_action(s_prime, q_table, method="greedy")
 
-        delta = agent.sarsa_update(q_table, s, a, reward, s_prime, a_prime)
-
-        e_table[s, a] = e_table[s, a] + 1
-
-        for u in range(n_s):
-            for b in range(n_a):
-                q_table[u, b] = q_table[u, b] + agent.alpha * delta * e_table[u, b]
-            e_table[u] = agent.gamma * agent.lamb * e_table[u]
+        agent.update(q_table, s, a, reward, s_prime, a_prime, e_table)
 
         # Transition to new state
         s = s_prime
@@ -68,8 +62,7 @@ for i_epsisode in range(n_episodes):
 
     clean_rate.append((env.nb_trashes - len(env.trashes)) / env.nb_trashes)
     crashes.append(crash_count)
-
-
+    agent.epsilon = agent.epsilon * agent.epsilon_decay
 
 ##################################################
 #      making real cute graphical interface      #
@@ -103,23 +96,16 @@ clean_count = 0
 crash_count = 0
 s = env.reset()
 nb_trashes = len(env.trashes)
-a = agent.act_with_epsilon_greedy(s,q_table)
+a = agent.get_action(s, q_table, method="greedy")
 
 # print out graphical interface for the LAST episode only !!!
 for t in range(100):
 
     s_prime, reward, done, info = env.step(a)
 
-    a_prime = agent.act_with_epsilon_greedy(s_prime, q_table)
+    a_prime = agent.get_action(s_prime, q_table, method="greedy")
 
-    delta = agent.sarsa_update(q_table, s, a, reward, s_prime, a_prime)
-
-    e_table[s, a] = e_table[s, a] + 1
-
-    for u in range(n_s):
-        for b in range(n_a):
-            q_table[u, b] = q_table[u, b] + agent.alpha * delta * e_table[u, b]
-        e_table[u] = agent.gamma * agent.lamb * e_table[u]
+    agent.update(q_table, s, a, reward, s_prime, a_prime, e_table)
 
     # Since the agent will not change position if it crashes the walls or obstacle
     # we need to take into account our graphic views
@@ -186,16 +172,17 @@ ax = fig.gca()
 ax.set_title('Cleaning rate for each epoch')
 ax.set_ylabel('Rate')
 ax.set_xlabel('Episode')
-ax.plot(clean_rate)
+ax.scatter(range(len(clean_rate)), clean_rate)
 
 canvas = agg.FigureCanvasAgg(fig)
 canvas.draw()
 renderer = canvas.get_renderer()
 raw_data = renderer.tostring_rgb()
+clean_rate_txt = np.mean(clean_rate)
 
 while True:
     DISPLAYSURF.fill(WHITE)
-    scoresurface = myfont.render("Cleaning rate : " + clean_count, False, (0, 0, 0))
+    scoresurface = myfont.render("Cleaning rate : " + str(clean_rate_txt), False, (0, 0, 0))
     DISPLAYSURF.blit(scoresurface, (50, 450))
     crash_surface = myfont.render("Crash count : " + str(crash_count), False, (0, 0, 0))
     DISPLAYSURF.blit(crash_surface, (50, 500))
@@ -203,7 +190,7 @@ while True:
     size = canvas.get_width_height()
 
     surf = pygame.image.fromstring(raw_data, size, "RGB")
-    DISPLAYSURF.blit(surf, (75, 0))
+    DISPLAYSURF.blit(surf, (120, 0))
 
     for event in pygame.event.get():
         if event.type == QUIT:

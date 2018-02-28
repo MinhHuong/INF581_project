@@ -17,27 +17,31 @@ if __name__ == '__main__':
 
     q_table = np.zeros([n_s, n_a]) # initialize the Q table
     e_table = np.zeros([n_s, n_a]) # initialize the eligibility trace
-    pi = (1.0 / n_a) * np.ones([n_s, n_a]) # initialize the policy map
 
-    [states, actions, rewards] = env.rollout(20, pi) # generate 20 (state, action, reward)'s following pi policy map
+    #pi = (1.0 / n_a) * np.ones([n_s, n_a]) # initialize the policy map
+    #[states, actions, rewards] = env.rollout(20, pi) # generate 20 (state, action, reward) following pi policy map
 
-    n_episode = 100
-    n_timestep = 300
+    n_episode = 1000
+    n_timestep = 100
+
+    cleaning_rate = []
+
+    '''
+    if we use NFQ, we should comment the update method below
+    '''
+    #q_table = agent.NFQ(env, n_timestep)
 
     # for each episode
     for i_episode in range(n_episode):
         s = env.reset()
-        print("====== Episode {}".format(i_episode))
-        a = agent.act_with_epsilon_greedy(s, q_table)
-        #a = act_with_softmax(s, q_table)
-        total_return = 0.0
+        #print("====== Episode {}".format(i_episode))
+        a = agent.get_action(s, q_table, method="greedy")
 
         # for each epoch
         for t in range(n_timestep):
 
             # Act: take a step and receive (new state, reward, termination flag, additional information)
             s_prime, reward, done, info = env.step(a)
-            total_return += np.power(agent.gamma, t) * reward # expected return = sum ( gamma^t * r_t )
 
             # if it is the last episode, print out info (to avoid print out too much)
             if (i_episode == n_episode-1):
@@ -45,40 +49,40 @@ if __name__ == '__main__':
                 print(info)
 
             # Select an action
-            #a_prime = act_with_softmax(s, q_table)
-            a_prime = agent.act_with_epsilon_greedy(s_prime, q_table)
+            '''We need to give method explicitely {"softmax", "greedy"}'''
+            a_prime = agent.get_action(s_prime, q_table, method="greedy")
 
-            # update a Q value table
-            delta = agent.sarsa_update(q_table, s, a, reward, s_prime, a_prime)
-
-            #q_table[s, a] = q_learning_update(q_table, s, a, reward, s_prime)
-
-            e_table[s, a] = e_table[s, a] + 1 # update eligibility trace when s = s_t
-
-            # Update q_table and e_table, following SARSA
-            for u in range(n_s):
-                for b in range(n_a):
-                    q_table[u, b] = q_table[u, b] + agent.alpha * delta * e_table[u, b] # Q(s,a) = Q(s,a) + alpha * delta_t * e(s,a)
-                e_table[u] = agent.gamma * agent.lamb * e_table[u] # e(s,a) = gamma * e(s,a)
-            #e_table[s] = e_table[s] / agent.gamma / agent.lamb # ??? :-( je comprends pas
+            # Update a Q value table
+            '''
+            Update method is implicitely given according to
+            the number of parameters
+            '''
+            agent.update(q_table, s, a, reward, s_prime, a_prime, e_table)
 
             # Transition to new state
             s = s_prime
             a = a_prime
 
             if done:
-                print("Episode finished after {} timesteps".format(t + 1))
-                print(info)
+                clean_rate = (env.nb_trashes - len(env.trashes))/env.nb_trashes
+                print("Episode: {0}\t Nb_Steps{1:>4}\t Epsilon: {2:.3f}\t Clean Rate: {3:.3f}\t".format(i_episode, t + 1, agent.epsilon, clean_rate))
+                #print(info)
                 break
 
         # add all these inside Agent ?
-        agent.epsilon = agent.epsilon * agent.decay_factor
+        agent.epsilon = agent.epsilon * agent.epsilon_decay
         agent.tau = agent.init_tau + i_episode * agent.tau_inc
 
-        print("total return {}".format(total_return))
-        print("percentage of cleaning {}".format((30 - len(env.trashes))/30))
-        #print("epsilon {}".format(epsilon))
+        #print("total return {}".format(total_return))
+        cleaning_rate.append(clean_rate)
 
     #print(q_table)
     #env.display()
-    np.savetxt('q_table.dat', q_table, fmt='%f')
+    #np.savetxt('q_table.dat', q_table, fmt='%f')
+    print(np.mean(cleaning_rate))
+    plt.ioff()
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+    ax.scatter(range(n_episode), cleaning_rate, label = "Cleaning rate")
+    ax.legend()
+    plt.show()
