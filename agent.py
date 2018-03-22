@@ -1,7 +1,5 @@
 import numpy as np
 from enum import IntEnum
-from sklearn.neural_network import MLPRegressor
-#from xgboost import XGBRegressor
 
 # ====== ACTION SPACE =====#
 
@@ -25,8 +23,8 @@ class Action(IntEnum):
 class Agent:
     '''Class that represents our hardworking agent'''
 
-    def __init__(self, pos=(0, 0), alpha=0.0001, epsilon_decay=0.999, epsilon=0.5, tau=1.0, tau_inc=0.01, init_tau=1.0,
-                 lamb=0.3, gamma=0.9):
+    def __init__(self, pos=(0, 0), alpha=0.0001, epsilon_decay=0.9984, epsilon=0.5, tau=1.0, tau_inc=0.3, init_tau=1.0,
+                 lamb=0.5, gamma=0.99):
         '''
         Create a new agent
 
@@ -44,6 +42,10 @@ class Agent:
         self.init_tau = init_tau
         self.lamb = lamb
 
+        self.ep_obs = []
+        self.ep_as = []
+        self.ep_rs = []
+
     def softmax(self, q):
         '''
         Softmax decision function
@@ -57,7 +59,7 @@ class Agent:
         ?
         '''
         assert self.tau >= 0.0
-        q_tilde = q - np.max(q)
+        q_tilde = q
         factors = np.exp(self.tau * q_tilde)
         return factors / np.sum(factors)
 
@@ -117,113 +119,7 @@ class Agent:
         td = r + self.gamma * np.max(q[s_prime, :]) - q[s, a]  # delta_t = r + gamma * max[Q(s',a')] - Q(s,a)
         return q[s, a] + self.alpha * td  # Q(s,a) = Q(s,a) + alpha * delta_t
 
-    # not correctly implemented!!!
-    def Policy_gradient(self, policy, env, max_iter):
-        '''
-        implementation of policy gradient to find the best policy
-
-        :param policy: initial policy
-        :param env: environment
-        :param max_iter: maximum iterations per episode
-        :return: policy
-        '''
-
-        alpha = 0.1
-
-        for iter in range(500): # let's say 500
-
-            ## do rollout following softmax exploration with policy as a params
-            s_t = env.reset()
-            states, actions, rewards = [], [], []
-            states.append(s_t)
-            for t in range(max_iter):
-                a_t = self.act_with_softmax(s_t, policy)
-                s_t, r_t, done, info = env.step(a_t)
-                states.append(s_t)
-                actions.append(a_t)
-                rewards.append(r_t)
-                if done:
-                    break
-
-            ## policy gradient
-            H = len(rewards)        # Horizon
-            PG = 0                  # Policy gradient
-            for t in range(H):
-                pi = self.softmax(policy[states[t], :])
-                R_t = sum(rewards[t::])
-                g_Qtable_log_pi = (1 - pi) * R_t * (1./self.tau)
-                PG += g_Qtable_log_pi
-            policy[s_t, :] += alpha * PG
-            self.tau = self.init_tau + iter * self.tau_inc
-        return policy
-
-    # do not whether it is well implemented yet
-    def NFQ(self, env, max_iter=100, n_timesteps=100):
-        '''
-        implementation of neural fitted Q iteration
-
-        :param env: environment
-        :param max_iter: maximum iterations per episode
-        :return: q_table
-        '''
-
-        n_s = env.state_space_n
-        n_a = env.action_space_n
-
-        q_table = np.random.randn(n_s, n_a) # initial q_table
-        XX = []                             # to store data
-        q_target = []                       # to store target
-
-        for iter in range(max_iter):
-
-            '''
-            TODO:
-            replace sklearn package with tensorflow + keras
-            like trying RNN or CNN
-            https://terrytangyuan.github.io/2016/03/14/scikit-flow-intro/
-            https://keras.io/layers/recurrent/
-            Also, we can play with the structure of learner below
-            '''
-            learner = MLPRegressor(activation="relu",
-                                   hidden_layer_sizes=(100, 3),
-                                   max_iter=2000,
-                                   solver='lbfgs')
-            '''
-            learner = XGBRegressor(n_estimators=500,
-                                   max_depth=4,
-                                   learning_rate=0.07,
-                                   subsample=.9,
-                                   min_child_weight=6,
-                                   colsample_bytree=.8,
-                                   scale_pos_weight=1.6,
-                                   gamma=10,
-                                   reg_alpha=8,
-                                   reg_lambda=1.3)
-            '''
-            ## do rollout following softmax policy
-            s_t = env.reset()
-            for t in range(n_timesteps):
-                a_t = self.act_with_epsilon_greedy(s_t, q_table)
-                s_tprime, r_t, done, info = env.step(a_t)
-                XX.append([s_t, a_t])
-                q_target.append(r_t + self.gamma * max(q_table[s_tprime, :]))
-                if done:
-                    break
-                s_t = s_tprime
-
-            self.epsilon = self.epsilon * self.epsilon_decay
-            self.tau = self.init_tau + iter * self.tau_inc
-
-            # Regression
-            learner.fit(XX, np.array(q_target))
-
-            # Resample
-            for s in range(n_s):
-                    q_table[s, :] = learner.predict([[s, a] for a in range(n_a)])
-        #print(q_table)
-        return q_table
-
-    def get_action(self, s_prime, q_table, method="greedy"):
+    def get_action(self, s_prime, q_table, good_acts = [], method="greedy"):
         '''
         Given an action according to the method
 
@@ -232,6 +128,10 @@ class Agent:
         :param method: how to act
         :return: an action
         '''
+        if len(good_acts) != 0:
+            n_trashes_surrounding = len(good_acts)
+            a = good_acts[0] if n_trashes_surrounding == 1 else good_acts[np.random.randint(n_trashes_surrounding)]
+            return a
         if method == "greedy":
             return self.act_with_epsilon_greedy(s_prime, q_table)
         if method == "softmax":
@@ -251,16 +151,33 @@ class Agent:
         :param e_table: eligibility table
         :return: None
         '''
-        if a_prime is None:             # Q_learning
-            q_table[s, a] = self.q_learning_update(q_table, s, a, reward, s_prime)
-        elif e_table is None:           # Sarsa
-            q_table[s, a] = self.sarsa_update(q_table, s, a, reward, s_prime, a_prime)
+        if e_table is None:
+            if a_prime is None:             # Q_learning
+                q_table[s, a] = self.q_learning_update(q_table, s, a, reward, s_prime)
+            else:                           # Sarsa
+                q_table[s, a] = self.sarsa_update(q_table, s, a, reward, s_prime, a_prime)
         else:                           # Eligibility trace
             e_table[s, a] = 1           # update eligibility trace when s = s_t | replacing trace
-            delta = self.sarsa_update(q_table, s, a, reward, s_prime, a_prime)
+            if a_prime is None:
+                delta = self.q_learning_update(q_table, s, a, reward, s_prime)
+            else:
+                delta = self.sarsa_update(q_table, s, a, reward, s_prime, a_prime)
             (n_s, n_a) = q_table.shape
             for u in range(n_s):
                 for b in range(n_a):
                     q_table[u, b] = q_table[u, b] + self.alpha * delta * e_table[u, b]  # Q(s,a) = Q(s,a) + alpha * delta_t * e(s,a)
                 e_table[u, :] = self.gamma * self.lamb * e_table[u, :]  # e(s,a) = gamma * e(s,a)
-            e_table[s, a] = e_table[s, a] / self.gamma / self.lamb  # ??? :-( je comprends pas
+
+    def store_transition(self, s, a, r):
+        self.ep_obs.append(s)
+        self.ep_as.append(a)
+        self.ep_rs.append(r)
+
+    def discounted_return(self, t = 0):
+        H = len(self.ep_as)  # get the horizon
+        discounted_returns = np.zeros(H - t)
+        current_discounted_return = 0
+        for tprime in reversed(range(t, H)):
+            current_discounted_return = current_discounted_return * self.gamma + self.ep_rs[tprime]
+            discounted_returns[tprime - t] = current_discounted_return
+        return discounted_returns

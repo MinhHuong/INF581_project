@@ -9,6 +9,7 @@ from environment import Environment
 from agent import Agent, Action
 from main import *
 import numpy as np
+from utils import Converter
 
 
 ######################################################################################
@@ -16,10 +17,11 @@ import numpy as np
 ######################################################################################
 
 agent = Agent(pos=(0,0)) # create a new agent
-env = Environment(agent) # add the agent to the environment
+env = Environment() # add the agent to the environment
+convert = Converter(env)
 
 facteur = 50
-agent_pos = env.agent.position # get the agent's position
+agent_pos = env.position # get the agent's position
 agent_pos = (agent_pos[0]*facteur, agent_pos[1]*facteur) # multiply it by a factor
 
 n_a = env.action_space_n # get the action space size
@@ -32,16 +34,17 @@ e_table = np.zeros([n_s, n_a]) # init eligibility traces
 clean_rate = []
 crashes = []
 crash_count = 0
-n_episodes = 300
-n_timesteps = 100
+n_episodes = 1000
+n_timesteps = 500
 
 #q_table=agent.NFQ(env, n_timesteps)
 for i_epsisode in range(n_episodes):
-    s = env.reset()
+    s = convert.state2tile(env.reset())
     a = agent.get_action(s, q_table, method="greedy")
 
     for t in range(n_timesteps):
         s_prime, reward, done, info = env.step(a)
+        s_prime = convert.state2tile(s_prime)
 
         a_prime = agent.get_action(s_prime, q_table, method="greedy")
 
@@ -51,11 +54,11 @@ for i_epsisode in range(n_episodes):
         s = s_prime
         a = a_prime
 
-        crash = 0
-        if info == "Go into walls!" or info == "Go into obstacle!":
-            crash = 1
+        #crash = 0
+        #if info == "Go into walls!" or info == "Go into obstacle!":
+        #    crash = 1
 
-        crash_count += crash
+        #crash_count += crash
 
         if done:
             break
@@ -92,18 +95,21 @@ agent_Img = pygame.image.load(path_img + 'Vicky_vac_copy.png')
 rock_Img = pygame.image.load(path_img + 'rock_copy.png')
 dust_Img = pygame.image.load(path_img + 'dust_copy.png')
 
+q_table = np.loadtxt('q_table.dat')
+
 clean_count = 0
 crash_count = 0
-s = env.reset()
+s = convert.state2tile(env.reset())
 nb_trashes = len(env.trashes)
-a = agent.get_action(s, q_table, method="greedy")
+a = agent.get_action(s, q_table, method="softmax")
 
 # print out graphical interface for the LAST episode only !!!
 for t in range(100):
 
     s_prime, reward, done, info = env.step(a)
+    s_prime = convert.state2tile(s_prime)
 
-    a_prime = agent.get_action(s_prime, q_table, method="greedy")
+    a_prime = agent.get_action(s_prime, q_table, method="softmax")
 
     agent.update(q_table, s, a, reward, s_prime, a_prime, e_table)
 
@@ -124,13 +130,13 @@ for t in range(100):
             DISPLAYSURF.blit(rock_Img, (rock_pos[0] * facteur, rock_pos[1] * facteur))
 
         if a == Action.LEFT:
-            DISPLAYSURF.blit(agent_Img, (env.agent.position[0] * facteur + (1 - crash) * (facteur - tick), env.agent.position[1] * facteur))
+            DISPLAYSURF.blit(agent_Img, (env.position[0] * facteur + (1 - crash) * (facteur - tick), env.position[1] * facteur))
         elif a == Action.RIGHT:
-            DISPLAYSURF.blit(agent_Img, (env.agent.position[0] * facteur - (1 - crash) * (facteur - tick), env.agent.position[1] * facteur))
+            DISPLAYSURF.blit(agent_Img, (env.position[0] * facteur - (1 - crash) * (facteur - tick), env.position[1] * facteur))
         elif a == Action.DOWN:
-            DISPLAYSURF.blit(agent_Img, (env.agent.position[0] * facteur, env.agent.position[1] * facteur + (1 - crash) * (facteur - tick)))
+            DISPLAYSURF.blit(agent_Img, (env.position[0] * facteur, env.position[1] * facteur + (1 - crash) * (facteur - tick)))
         elif a == Action.UP:
-            DISPLAYSURF.blit(agent_Img, (env.agent.position[0] * facteur, env.agent.position[1] * facteur - (1 - crash) * (facteur - tick)))
+            DISPLAYSURF.blit(agent_Img, (env.position[0] * facteur, env.position[1] * facteur - (1 - crash) * (facteur - tick)))
 
         pygame.draw.line(DISPLAYSURF, RED, (0, HEIGHT), (WIDTH, HEIGHT), 2)
 
